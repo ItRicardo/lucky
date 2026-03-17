@@ -30,7 +30,7 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
   const lastUpdateRef = useRef(0);
   const candidatesRef = useRef(candidates);
 
-  const { currentPrizeId, prizes, settings, viewMode } = useLotteryStore();
+  const { currentPrizeId, prizes, settings, viewMode, winners } = useLotteryStore();
   const currentPrize = prizes.find(p => p.id === currentPrizeId);
 
   // 保持 candidates 引用最新
@@ -350,6 +350,72 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
                   )}
                 </AnimatePresence>
               </div>
+            </motion.div>
+          )}
+
+          {/* 模式 4: 获奖结果页 */}
+          {viewMode === 'result' && (
+            <motion.div
+              key="result"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.1 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="w-full max-w-7xl px-8 flex flex-col items-center"
+            >
+              <motion.h2
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-yellow-500 text-3xl md:text-5xl font-cinzel tracking-[0.3em] uppercase mb-12 drop-shadow-[0_0_20px_rgba(255,215,0,0.5)]"
+              >
+                获奖结果
+              </motion.h2>
+              <div className="space-y-8 w-full">
+                {prizes.map((prize, idx) => {
+                  const prizeWinners = winners.filter(winner => winner.prizeId === prize.id);
+                  if (prizeWinners.length === 0) return null;
+                  
+                  return (
+                    <motion.div
+                      key={prize.id}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + idx * 0.1, type: "spring" }}
+                      className="relative group"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/30 to-red-900/40 blur-2xl rounded-3xl group-hover:blur-3xl transition-all" />
+                      <div className="relative bg-black/60 backdrop-blur-md border-2 border-yellow-500/40 p-8 rounded-3xl flex flex-col items-center justify-center text-center hover:border-yellow-500/80 transition-all shadow-[0_0_40px_rgba(255,215,0,0.15)]">
+                        <div className="text-4xl md:text-5xl font-bold text-white font-cinzel mb-3 drop-shadow-lg">{prize.name}</div>
+                        <div className="text-yellow-400 text-2xl font-bold mb-6">× {prizeWinners.length} 名</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                          {prizeWinners.map((winner, wIdx) => (
+                            <motion.p
+                              key={winner.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.5 + idx * 0.1 + wIdx * 0.05 }}
+                              className="text-white text-lg md:text-xl"
+                            >
+                              {winner.name} - {winner.dept}
+                            </motion.p>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+              {prizes.every(prize => winners.filter(winner => winner.prizeId === prize.id).length === 0) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-center text-white text-xl py-12"
+                >
+                  暂无获奖记录
+                </motion.div>
+              )}
             </motion.div>
           )}
 

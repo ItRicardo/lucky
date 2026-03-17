@@ -14,7 +14,8 @@ interface LotteryState {
   currentPrizeId: string | null;
   isRolling: boolean;
   roundWinners: Participant[]; // 当前轮次已计算出的中奖者（等待展示）
-  viewMode: 'welcome' | 'lottery' | 'prize';  // prize: 奖项展示页
+  viewMode: 'welcome' | 'lottery' | 'prize' | 'result';  // result: 获奖结果页
+  showConfirmDialog: boolean; // 是否显示确认对话框
   
   settings: Settings;
   
@@ -24,7 +25,8 @@ interface LotteryState {
   updatePrize: (id: string, updates: Partial<Prize>) => void;
   removePrize: (id: string) => void;
   selectPrize: (id: string | null) => void;
-  setViewMode: (mode: 'welcome' | 'lottery' | 'prize') => void;
+  setViewMode: (mode: 'welcome' | 'lottery' | 'prize' | 'result') => void;
+  setShowConfirmDialog: (show: boolean) => void;
   
   // 控制逻辑
   startRolling: () => void;
@@ -53,6 +55,7 @@ export const useLotteryStore = create<LotteryState>()(
       isRolling: false,
       roundWinners: [],
       viewMode: 'welcome',
+      showConfirmDialog: false,
       
       settings: {
         title: 'Lucky Draw 2026',
@@ -121,6 +124,8 @@ export const useLotteryStore = create<LotteryState>()(
 
       setViewMode: (mode) => set({ viewMode: mode }),
 
+      setShowConfirmDialog: (show) => set({ showConfirmDialog: show }),
+
       startRolling: () => {
         const state = get();
         const { participants, winners, currentPrizeId, prizes } = state;
@@ -131,6 +136,14 @@ export const useLotteryStore = create<LotteryState>()(
         const currentPrize = prizes.find(p => p.id === currentPrizeId);
         if (!currentPrize) {
           set({ isRolling: false, roundWinners: [] });
+          return;
+        }
+
+        // 检查当前奖项的已中奖人数是否达到上限
+        const currentPrizeWinners = winners.filter(w => w.prizeId === currentPrizeId);
+        if (currentPrizeWinners.length >= currentPrize.count) {
+          // 显示确认对话框
+          set({ showConfirmDialog: true });
           return;
         }
 

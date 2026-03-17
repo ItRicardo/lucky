@@ -27,10 +27,10 @@ export default function AdminPage() {
     return sessionStorage.getItem('admin_authenticated') === 'true';
   });
   const {
-    participants, winners, prizes, settings, currentPrizeId, isRolling, roundWinners, viewMode,
+    participants, winners, prizes, settings, currentPrizeId, isRolling, roundWinners, viewMode, showConfirmDialog,
     importParticipants, fullReset, resetWinners,
     addPrize, updatePrize, removePrize, setSettings, selectPrize, setViewMode,
-    startRolling, stopRolling,
+    startRolling, stopRolling, setShowConfirmDialog,
     addParticipant, updateParticipant, removeParticipant
   } = useLotteryStore();
 
@@ -513,6 +513,18 @@ export default function AdminPage() {
                      <span className="text-3xl">🎰</span>
                      <span>抽奖页</span>
                    </Button>
+                   <Button
+                     variant={viewMode === 'result' ? 'default' : 'outline'}
+                     onClick={() => setViewMode('result')}
+                     disabled={isRolling}
+                     className={cn(
+                       "w-24 h-24 flex flex-col gap-2 text-base",
+                       viewMode === 'result' && "ring-2 ring-primary ring-offset-2"
+                     )}
+                   >
+                     <span className="text-3xl">🏆</span>
+                     <span>结果页</span>
+                   </Button>
                 </div>
               </div>
               
@@ -888,6 +900,41 @@ export default function AdminPage() {
             </div>
             <DialogFooter>
                 <Button onClick={savePrize}>保存</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 确认对话框 */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>确认抽奖</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+                <p className="text-lg">当前奖项的已中奖人数已达到上限，是否确认继续抽奖？</p>
+                <p className="text-muted-foreground mt-2">继续抽奖可能会导致中奖人数超过设置的上限。</p>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>取消</Button>
+                <Button onClick={() => {
+                  setShowConfirmDialog(false);
+                  // 强制开始抽奖，忽略人数上限
+                  const state = useLotteryStore.getState();
+                  const { participants, winners, currentPrizeId, prizes } = state;
+                  if (!currentPrizeId) return;
+                  const currentPrize = prizes.find(p => p.id === currentPrizeId);
+                  if (!currentPrize) return;
+                  
+                  const winnerIds = new Set(winners.map(w => w.id));
+                  const validPool = participants.filter(p => !winnerIds.has(p.id) && !p.banned);
+                  const finalPool = validPool.filter(p => !p.mustWinPrizeId || p.mustWinPrizeId === currentPrizeId);
+                  if (finalPool.length === 0) {
+                    useLotteryStore.setState({ isRolling: false, roundWinners: [] });
+                    return;
+                  }
+                  
+                  useLotteryStore.setState({ isRolling: true, roundWinners: [], viewMode: 'lottery' });
+                }}>确认继续</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
