@@ -28,4 +28,5 @@ export interface Settings {
   welcomeSubtitle: string;
   prizePageTitle: string;  // 奖项页标题
   logo?: string;  // 公司 logo (base64)
+  defaultParticipantFile?: string;  // 默认人员文件
 }

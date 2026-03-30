@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import Papa from 'papaparse';
 import type { Participant, Winner, Prize, Settings } from '../lib/types';
 import { drawWinners } from '../lib/lottery-logic';
+import { defaultParticipants, testDeptParticipants, testNoDeptParticipants } from '../data';
 
 interface LotteryState {
   participants: Participant[];
@@ -39,12 +40,44 @@ interface LotteryState {
   addParticipant: (p: Omit<Participant, 'id'>) => void;
   updateParticipant: (id: string, updates: Partial<Participant>) => void;
   removeParticipant: (id: string) => void;
+  initializeParticipants: () => void;
 }
 
 export const useLotteryStore = create<LotteryState>()(
   persist(
     (set, get) => ({
       participants: [],
+      
+      // 初始化时根据配置加载人员信息
+      initializeParticipants: () => {
+        const state = get();
+        if (state.participants.length > 0) return;
+        
+        let participantsToLoad = defaultParticipants;
+        switch (state.settings.defaultParticipantFile) {
+          case 'test-dept':
+            participantsToLoad = testDeptParticipants;
+            break;
+          case 'test-no-dept':
+            participantsToLoad = testNoDeptParticipants;
+            break;
+          default:
+            participantsToLoad = defaultParticipants;
+        }
+        
+        // 为每个人员对象添加缺失的属性，确保类型匹配
+        const formattedParticipants = participantsToLoad.map(person => ({
+          id: person.id,
+          name: person.name,
+          dept: person.dept,
+          mustWinPrizeId: null,
+          banned: false,
+          weight: 1
+        }));
+
+        
+        set({ participants: formattedParticipants });
+      },
       winners: [],
       prizes: [
         { id: '1', name: '三等奖', count: 5 },
@@ -64,6 +97,7 @@ export const useLotteryStore = create<LotteryState>()(
         welcomeSubtitle: '携手共进 · 再创辉煌',
         prizePageTitle: '奖项',
         logo: '',
+        defaultParticipantFile: 'default',
       },
 
       importParticipants: (csvText: string, includeControlledFields: boolean = false) => {

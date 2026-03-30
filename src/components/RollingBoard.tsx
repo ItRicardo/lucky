@@ -4,7 +4,7 @@ import { useLotteryStore } from "@/store/useStore";
 import { cn } from "@/lib/utils";
 import bgImg from "@/assets/bg.jpg";
 import confetti from "canvas-confetti";
-import { Maximize2, Settings } from "lucide-react";
+import { Maximize2, Settings, Gift } from "lucide-react";
 
 interface RollingBoardProps {
   isRolling: boolean;
@@ -24,13 +24,22 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
   const [displayNames, setDisplayNames] = useState(generateMockNames(candidates, 12));
   const [isAnimating, setIsAnimating] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [canReplayConfetti, setCanReplayConfetti] = useState(true);
   const animationRef = useRef<number>(0);
   const phaseRef = useRef<'idle' | 'accelerating' | 'running' | 'decelerating'>('idle');
   const speedRef = useRef(0);
   const lastUpdateRef = useRef(0);
   const candidatesRef = useRef(candidates);
+  
+  // 触摸事件相关
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const touchEndX = useRef(0);
+  const touchEndY = useRef(0);
+  const tapCount = useRef(0);
+  const tapTimeout = useRef<number | null>(null);
 
-  const { currentPrizeId, prizes, settings, viewMode, winners } = useLotteryStore();
+  const { currentPrizeId, prizes, settings, viewMode, winners, setViewMode, selectPrize, startRolling, stopRolling } = useLotteryStore();
   const currentPrize = prizes.find(p => p.id === currentPrizeId);
 
   // 保持 candidates 引用最新
@@ -138,39 +147,160 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
   // 监听中奖展示，触发撒花特效
   useEffect(() => {
     if (showWinners) {
-        // 从左右两侧发射礼花
-        const end = Date.now() + 3000;
-        const colors = ['#FFD700', '#FF4500', '#FFFFFF'];
-        let animationId: number;
-
-        (function frame() {
-            confetti({
-                particleCount: 3,
-                angle: 60,
-                spread: 55,
-                origin: { x: 0, y: 0.8 },
-                colors: colors
-            });
-            confetti({
-                particleCount: 3,
-                angle: 120,
-                spread: 55,
-                origin: { x: 1, y: 0.8 },
-                colors: colors
-            });
-
-            if (Date.now() < end) {
-                animationId = requestAnimationFrame(frame);
-            }
-        }());
-
-        return () => {
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-            }
-        };
+        replayConfetti();
     }
   }, [showWinners]);
+
+  // 重新播放洒礼花动画
+  const replayConfetti = () => {
+    if (!canReplayConfetti) return;
+    
+    setCanReplayConfetti(false);
+    
+    // 从左右两侧发射礼花
+    const end = Date.now() + 3000;
+    const colors = ['#FFD700', '#FF4500', '#FFFFFF'];
+    let animationId: number;
+
+    (function frame() {
+        confetti({
+            particleCount: 3,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0, y: 0.8 },
+            colors: colors
+        });
+        confetti({
+            particleCount: 3,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1, y: 0.8 },
+            colors: colors
+        });
+
+        if (Date.now() < end) {
+            animationId = requestAnimationFrame(frame);
+        }
+    }());
+
+    // 3秒后恢复可点击状态
+    setTimeout(() => {
+        setCanReplayConfetti(true);
+    }, 3000);
+
+    return () => {
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+        }
+    };
+  };
+
+  // 触摸事件处理
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    touchEndY.current = e.changedTouches[0].clientY;
+    handleSwipe();
+    handleTap();
+  };
+
+  // 处理滑动事件
+  const handleSwipe = () => {
+    const diffX = touchEndX.current - touchStartX.current;
+    const diffY = touchEndY.current - touchStartY.current;
+    
+    // 左右滑动 - 切换页面
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      if (diffX > 0) {
+        // 向右滑动 - 上一个页面
+        if (viewMode === 'lottery') {
+          setViewMode('prize');
+        } else if (viewMode === 'prize') {
+          setViewMode('welcome');
+        } else if (viewMode === 'result') {
+          setViewMode('lottery');
+        }
+      } else {
+        // 向左滑动 - 下一个页面
+        if (viewMode === 'welcome') {
+          setViewMode('prize');
+        } else if (viewMode === 'prize') {
+          setViewMode('lottery');
+        } else if (viewMode === 'lottery') {
+          setViewMode('result');
+        }
+      }
+    }
+    
+    // 上下滑动 - 切换奖项（仅在抽奖页）
+    if (viewMode === 'lottery' && Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 50) {
+      const currentIndex = prizes.findIndex(p => p.id === currentPrizeId);
+      if (diffY > 0) {
+        // 向下滑动 - 上一个奖项
+        if (currentIndex > 0) {
+          selectPrize(prizes[currentIndex - 1].id);
+        }
+      } else {
+        // 向上滑动 - 下一个奖项
+        if (currentIndex < prizes.length - 1) {
+          selectPrize(prizes[currentIndex + 1].id);
+        }
+      }
+    }
+  };
+
+  // 处理点击事件
+  const handleTap = () => {
+    const diffX = Math.abs(touchEndX.current - touchStartX.current);
+    const diffY = Math.abs(touchEndY.current - touchStartY.current);
+    
+    // 点击事件（移动距离很小）
+    if (diffX < 10 && diffY < 10) {
+      tapCount.current++;
+      
+      // 清除之前的定时器
+      if (tapTimeout.current) {
+        clearTimeout(tapTimeout.current);
+      }
+      
+      // 设置新的定时器，200ms内的点击算连续点击
+      tapTimeout.current = window.setTimeout(() => {
+        if (tapCount.current === 1) {
+          // 单击 - 开始/停止抽奖（仅在抽奖页）
+          if (viewMode === 'lottery') {
+            if (isRolling) {
+              stopRolling();
+            } else {
+              startRolling();
+            }
+          }
+        } else if (tapCount.current === 2) {
+          // 双击 - 下一个奖项（仅在抽奖页）
+          if (viewMode === 'lottery') {
+            const currentIndex = prizes.findIndex(p => p.id === currentPrizeId);
+            if (currentIndex < prizes.length - 1) {
+              selectPrize(prizes[currentIndex + 1].id);
+            }
+          }
+        } else if (tapCount.current === 3) {
+          // 三击 - 上一个奖项（仅在抽奖页）
+          if (viewMode === 'lottery') {
+            const currentIndex = prizes.findIndex(p => p.id === currentPrizeId);
+            if (currentIndex > 0) {
+              selectPrize(prizes[currentIndex - 1].id);
+            }
+          }
+        }
+        
+        // 重置点击计数
+        tapCount.current = 0;
+      }, 200);
+    }
+  };
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -182,7 +312,11 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
   }, []);
 
   return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden">
+    <div 
+      className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Background with overlay */}
       <div 
         className="absolute inset-0 bg-cover bg-center z-0" 
@@ -422,8 +556,8 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
         </AnimatePresence>
       </div>
 
-      {!isFullscreen && (
-        <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-3">
+      <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-3">
+        {!isFullscreen && (
           <button
             type="button"
             title="全屏显示"
@@ -438,6 +572,8 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
           >
             <Maximize2 className="h-5 w-5" />
           </button>
+        )}
+        {!isFullscreen && (
           <a
             href="#/admin"
             title="进入后台管理"
@@ -445,8 +581,19 @@ export default function RollingBoard({ isRolling, candidates, currentWinners }: 
           >
             <Settings className="h-5 w-5" />
           </a>
-        </div>
-      )}
+        )}
+        {viewMode === 'lottery' && showWinners && (
+          <button
+            type="button"
+            title="重新播放礼花"
+            onClick={replayConfetti}
+            disabled={!canReplayConfetti}
+            className="h-10 w-10 rounded-full bg-white/10 text-white border border-white/20 backdrop-blur hover:bg-white/20 hover:border-white/40 flex items-center justify-center"
+          >
+            <Gift className="h-5 w-5" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

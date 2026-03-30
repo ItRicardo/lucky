@@ -31,8 +31,14 @@ export default function AdminPage() {
     importParticipants, fullReset, resetWinners,
     addPrize, updatePrize, removePrize, setSettings, selectPrize, setViewMode,
     startRolling, stopRolling, setShowConfirmDialog,
-    addParticipant, updateParticipant, removeParticipant
+    addParticipant, updateParticipant, removeParticipant,
+    initializeParticipants
   } = useLotteryStore();
+
+  // 初始化人员信息
+  useEffect(() => {
+    initializeParticipants();
+  }, [initializeParticipants]);
 
   const [csvText, setCsvText] = useState("");
 
@@ -77,6 +83,7 @@ export default function AdminPage() {
     prizePageTitle: settings.prizePageTitle || '',
     password: settings.password,
     logo: settings.logo || '',
+    defaultParticipantFile: settings.defaultParticipantFile || 'default',
   });
 
   // 当 settings 变化时同步到表单（首次加载或外部变化）
@@ -88,8 +95,9 @@ export default function AdminPage() {
       prizePageTitle: settings.prizePageTitle || '',
       password: settings.password,
       logo: settings.logo || '',
+      defaultParticipantFile: settings.defaultParticipantFile || 'default',
     });
-  }, [settings.title, settings.welcomeTitle, settings.welcomeSubtitle, settings.prizePageTitle, settings.password, settings.logo]);
+  }, [settings.title, settings.welcomeTitle, settings.welcomeSubtitle, settings.prizePageTitle, settings.password, settings.logo, settings.defaultParticipantFile]);
 
   // Search
   const [searchTerm, setSearchTerm] = useState("");
@@ -812,6 +820,20 @@ export default function AdminPage() {
                  <Label>后台管理密码</Label>
                  <Input value={settingsForm.password} onChange={e => setSettingsForm({...settingsForm, password: e.target.value})} />
                  <p className="text-xs text-muted-foreground">建议设置为复杂的密码以防误入。</p>
+               </div>
+               <div className="space-y-2">
+                 <Label>默认人员文件</Label>
+                 <Select value={settingsForm.defaultParticipantFile} onValueChange={v => setSettingsForm({...settingsForm, defaultParticipantFile: v})}>
+                   <SelectTrigger>
+                     <SelectValue placeholder="选择默认人员文件" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="default">默认人员（50人，无部门）</SelectItem>
+                     <SelectItem value="test-dept">测试人员（有部门）</SelectItem>
+                     <SelectItem value="test-no-dept">测试人员（无部门）</SelectItem>
+                   </SelectContent>
+                 </Select>
+                 <p className="text-xs text-muted-foreground">当localStorage中无数据时，将加载此文件的人员信息。</p>
                </div>
                <Button onClick={handleSaveSettings} className="w-full">保存设置</Button>
                <div className="mt-6 p-3 bg-muted/50 rounded-lg border text-xs text-muted-foreground">

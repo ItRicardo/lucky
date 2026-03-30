@@ -5,8 +5,13 @@ import { toast } from "sonner";
 
 export default function DisplayPage() {
   const { 
-    participants, currentPrizeId, prizes, isRolling, roundWinners, settings, setViewMode, viewMode, selectPrize, startRolling, stopRolling 
+    participants, currentPrizeId, prizes, isRolling, roundWinners, settings, setViewMode, viewMode, selectPrize, startRolling, stopRolling, initializeParticipants 
   } = useLotteryStore();
+
+  // 初始化人员信息
+  useEffect(() => {
+    initializeParticipants();
+  }, [initializeParticipants]);
 
   useEffect(() => {
     setViewMode('welcome');
